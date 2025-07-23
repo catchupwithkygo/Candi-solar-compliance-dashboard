@@ -9,10 +9,8 @@ import requests
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Candi Solar Compliance Dashboard",
-    layout="centered",
-    initial_sidebar_state="auto"
-    # layout="widece",  # Uncomment if you want a wide layout
-    # initial_sidebar_state="expanded"
+    layout="wide",
+    initial_sidebar_state="expanded"  # Corrected from "widened" to "expanded"
 )
 
 # --- Embedded CSV Data (simulating file input) ---
@@ -123,46 +121,139 @@ def process_data(df):
 df = load_data()
 metrics = process_data(df)
 
-# --- Header with Logo and Title ---
+# --- Enhanced Layout and Styling ---
+# Center the logo and title at the top of the app
 with st.container():
     col1, col2 = st.columns([1, 4])
     with col1:
-        # Load logo from local file
-        logo_path = "logo.png"  # Make sure logo.png is in the same directory as this script
+        # Load logo from local directory
+        logo_path = "C:\\Users\\kabel\\Hello\\candi_B.png"
         try:
             image = Image.open(logo_path)
-            st.image(image, width=150)
-        except Exception:
-            st.write(":sunny:")
-        logo_url = "https://www.candi.solar/wp-content/uploads/2022/09/candi-logo.svg"
-        try:
-            response = requests.get(logo_url, timeout=5)
-            if response.status_code == 200:
-                image = Image.open(StringIO(response.content))
-                st.image(image, width=150)
-            else:
-                st.write(":sunny:")
-        except requests.exceptions.RequestException:
-            st.write(":sunny:")
+            st.image(image, width=120)  # Adjusted width for better alignment
+        except FileNotFoundError:
+            st.write("Logo file not found.")
     with col2:
         st.markdown(
             """
-            <h1 style='margin-bottom:0;'>Candi Solar Compliance Dashboard</h1>
-            <div style='font-size:1.1rem; color:#555;'>Monitor client compliance metrics and trends for Candi Solar.</div>
+            <h1 style='margin-bottom:0; color:#FFFFFF;'>Candi Solar Compliance Dashboard</h1>
+            <div style='font-size:1.2rem; color:#7F8C8D;'>Track and monitor client compliance metrics effectively.</div>
             """,
             unsafe_allow_html=True
         )
 
-
-# --- Sidebar for View Selection ---
+# Adjust sidebar styling
 with st.sidebar:
+    st.markdown(
+        """
+        <style>
+        .css-1d391kg {background-color: #F4F6F7;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
     st.header(":bar_chart: Dashboard Views")
     view = st.selectbox(
         "Select View",
-        ["Summary", "Compliance", "Timeline", "Data Table"],
+        ["Summary", "Compliance Tracker", "Timeline", "Data Table"],
         index=0
     )
 
+# Add footer for branding
+st.markdown(
+    """
+    <hr>
+    <div style='text-align:center; font-size:0.9rem; color:#95A5A6;'>
+    © 2023 Candi Solar. All rights reserved.
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Adjust background color to black ---
+st.markdown(
+    """
+    <style>
+    .main, .block-container, .css-1d391kg, .stSidebar {background-color: #000000; color: #FFFFFF;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Compliance Tracker and Dashboard Section ---
+# Add file uploader for Excel sheet
+uploaded_file = st.sidebar.file_uploader(
+    "Upload an Excel file for Compliance Tracker", type=["xlsx", "xls"])
+
+if uploaded_file:
+    try:
+        uploaded_data = pd.read_excel(uploaded_file)
+        st.success("File uploaded successfully!")
+
+        # Ensure the uploaded file contains the required columns
+        required_columns = [
+            "Client Name", "Directors Details (Confidential)", "Country", "Province/State", "City",
+            "Industry Summary", "ESG Summary", "Credit Risk Rating", "PEP Match?", "Media Hits?",
+            "Additional Notes", "Completion Status"
+        ]
+        if not all(col in uploaded_data.columns for col in required_columns):
+            raise ValueError(
+                "Uploaded file is missing one or more required columns.")
+
+        # Compliance Tracker View
+        st.header(":clipboard: Compliance Tracker and Dashboard")
+        st.subheader("Uploaded Data Table")
+        st.dataframe(uploaded_data, use_container_width=True)
+
+        # Add download button for the uploaded data
+        csv = uploaded_data.to_csv(index=False)
+        st.download_button(
+            label="Download Compliance Tracker Data as CSV",
+            data=csv,
+            file_name="compliance_tracker_data.csv",
+            mime="text/csv"
+        )
+
+        # Metrics and Insights Section
+        st.subheader(":bar_chart: Metrics and Insights")
+        total_clients = len(uploaded_data)
+        completed_status_count = uploaded_data[uploaded_data["Completion Status"]
+                                               == "Completed"].shape[0]
+        pep_match_count = uploaded_data[uploaded_data["PEP Match?"]
+                                        == "Yes"].shape[0]
+        media_hits_count = uploaded_data[uploaded_data["Media Hits?"]
+                                         == "Yes"].shape[0]
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Clients", total_clients)
+        col2.metric("Completed Status", completed_status_count)
+        col3.metric("PEP Matches", pep_match_count)
+        st.metric("Media Hits", media_hits_count)
+
+        # Compliance Status Visualization
+        st.subheader(":shield: Compliance Status Distribution")
+        compliance_counts = uploaded_data["Completion Status"].value_counts(
+        ).reset_index()
+        compliance_counts.columns = ["Status", "Count"]
+        fig = px.bar(
+            compliance_counts,
+            x="Status",
+            y="Count",
+            color="Status",
+            color_discrete_map={"Completed": "#00CC96", "Pending": "#EF553B"},
+            title="Completion Status Distribution",
+            text="Count"
+        )
+        fig.update_layout(showlegend=False, title_x=0.5,
+                          margin=dict(t=50, b=50))
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.info(
+            "The metrics above summarize the compliance tracker data, highlighting key insights such as completion status, PEP matches, and media hits."
+        )
+
+    except Exception as e:
+        st.error(f"Error processing the uploaded file: {e}")
 
 # --- Main Views ---
 if view == "Summary":
@@ -174,26 +265,6 @@ if view == "Summary":
     st.info(
         "Most clients are subsidiaries, indicating strong corporate group affiliations.")
     st.markdown("<hr>**Overview**: This dashboard tracks compliance for Candi Solar clients, including credit assessments and external checks.", unsafe_allow_html=True)
-
-elif view == "Compliance":
-    st.header(":shield: Compliance Status")
-    compliance_counts = metrics["df"]["Compliance Status"].value_counts(
-    ).reset_index()
-    compliance_counts.columns = ["Status", "Count"]
-    fig = px.bar(
-        compliance_counts,
-        x="Status",
-        y="Count",
-        color="Status",
-        color_discrete_map={"Compliant": "#00CC96",
-                            "Non-Compliant": "#EF553B"},
-        title="Compliance Status Distribution",
-        text="Count"
-    )
-    fig.update_layout(showlegend=False, title_x=0.5, margin=dict(t=50, b=50))
-    st.plotly_chart(fig, use_container_width=True)
-    st.warning(
-        "Compliant clients have a completed credit assessment and a confirmed external credit check.")
 
 elif view == "Timeline":
     st.header(":date: Contract Signing Timeline")
@@ -226,3 +297,32 @@ elif view == "Data Table":
     )
     st.caption(
         "Tip: Use the column headers to sort the table, or scroll to view all clients.")
+
+    # Add download button
+    csv = metrics["df"].to_csv(index=False)
+    st.download_button(
+        label="Download Data as CSV",
+        data=csv,
+        file_name="compliance_data.csv",
+        mime="text/csv"
+    )
+
+# --- Compliance Section ---
+st.header(":shield: Compliance Metrics")
+compliance_counts = metrics["df"]["Compliance Status"].value_counts(
+).reset_index()
+compliance_counts.columns = ["Status", "Count"]
+fig = px.bar(
+    compliance_counts,
+    x="Status",
+    y="Count",
+    color="Status",
+    color_discrete_map={"Compliant": "#00CC96", "Non-Compliant": "#EF553B"},
+    title="Compliance Status Distribution",
+    text="Count"
+)
+fig.update_layout(showlegend=False, title_x=0.5, margin=dict(t=50, b=50))
+st.plotly_chart(fig, use_container_width=True)
+st.warning(
+    "Compliant clients have a completed credit assessment and a confirmed external credit check."
+)
